@@ -63,7 +63,7 @@ def make_response(req):
                 response['response']['text'] = 'Найти кролика можно в Яндекс.Маркете!'
                 sessionStorage[user_id]['rabbit_bought'] = True
 
-                response['response']['buttons'] = get_suggests(user_id)
+                response['response']['end_session'] = True
                 return response
         else:
             if sessionStorage[user_id]['elephant_bought'] is False:
