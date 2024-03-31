@@ -18,7 +18,7 @@ def main():
     '''
     logging.info(f'Request: {request.json!r}')
     # создаём ответ на основе запроса Алисы
-    response = make_response(request)
+    response = make_response(request.json)
     logging.info(f'Response:  {response!r}')
 
     return jsonify(response)
@@ -27,7 +27,7 @@ def main():
 def make_response(req):
     '''
     Функция создаёт ответ в зависимости от запроса
-    :param req: запрос
+    :param req: json
     :return: сформированный словарь с ответом
     '''
     response = {
