@@ -1,3 +1,5 @@
+import random
+
 from flask import Flask, request, jsonify
 import logging
 
@@ -15,6 +17,19 @@ def main():
     :return:
     '''
     logging.info(f'Request: {request.json!r}')
+    # создаём ответ на основе запроса Алисы
+    response = make_response(request)
+    logging.info(f'Response:  {response!r}')
+
+    return jsonify(response)
+
+
+def make_response(req):
+    '''
+    Функция создаёт ответ в зависимости от запроса
+    :param req: запрос
+    :return: сформированный словарь с ответом
+    '''
     response = {
         'session': request.json['session'],
         'version': request.json['version'],
@@ -23,75 +38,59 @@ def main():
         }
     }
 
-    handle_dialog(request.json, response)
-
-    logging.info(f'Response:  {response!r}')
-
-    # Преобразовываем в JSON и возвращаем
-    return jsonify(response)
-
-
-def handle_dialog(req, res):
-    '''
-    Функция для формирования ответа
-    :param req: запрос алисы
-    :param res: заготовка ответа
-    :return:
-    '''
     user_id = req['session']['user_id']
 
     if req['session']['new']:
-
         sessionStorage[user_id] = {
-            'suggests': [
-                "Не хочу.",
-                "Не буду.",
-                "Отстань!",
-            ]
+            'suggests_elephant': ['Не хочу!', 'Отстань!', 'Не буду!', 'Мне не нужен слон!'],
+            'suggests_rabbit': ['Не хочу!', 'Отстань!', 'Не буду!', 'Мне не нужен кролик!'],
+            'elephant_bought': False,
+            'rabbit_bought': False
         }
-        res['response']['text'] = 'Привет! Купи слона!'
-        res['response']['buttons'] = get_suggests(user_id)
-        return
+        response['response']['text'] = 'Привет! Купи слона!'
+        response['response']['buttons'] = get_suggests(user_id)
+    else:
+        if any([el in req['request']['original_utterance'].lower()
+                for el in ['ладно', 'куплю', 'покупаю', 'хорошо']]):
+            if sessionStorage[user_id]['elephant_bought'] is False:
+                response['response']['text'] = 'Найти слона можно в Яндекс.Маркете!\n' \
+                                               'А теперь купи кролика!'
+                sessionStorage[user_id]['elephant_bought'] = True
 
-    if any([el in req['request']['original_utterance'].lower() for el in ['ладно', 'куплю', 'покупаю', 'хорошо']]):
-        # Пользователь согласился, прощаемся.
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
-        return
+                response['response']['buttons'] = get_suggests(user_id)
+                return response
+            else:
+                response['response']['text'] = 'Найти кролика можно в Яндекс.Маркете!'
+                sessionStorage[user_id]['rabbit_bought'] = True
 
-    # Если нет, то убеждаем его купить слона!
-    res['response']['text'] = \
-        f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
-    res['response']['buttons'] = get_suggests(user_id)
+                response['response']['buttons'] = get_suggests(user_id)
+                return response
+        else:
+            if sessionStorage[user_id]['elephant_bought'] is False:
+                response['response']['text'] = f'Все говорят \'{req["original_utterance"]}\', а ты купи слона!'
+            else:
+                response['response']['text'] = f'Все говорят \'{req["original_utterance"]}\', а ты купи кролика!'
+
+            response['response']['buttons'] = get_suggests(user_id)
+            return response
 
 
-# Функция возвращает две подсказки для ответа.
 def get_suggests(user_id):
     '''
-    Функция возвращает подсказки для ответа
-    :param user_id: id пользователя, с которым общается Алиса
-    :return:
+    Функция возвращает 2 случайные подсказки и удаляет их из списка
+    :param user_id: id пользователя
+    :return: 2 подсказки в виде словаря с параметрами
     '''
-    session = sessionStorage[user_id]
+    if sessionStorage[user_id]['elephant_bought'] is False:
+        animal = 'suggest_elephant'
+    else:
+        animal = 'suggest_rabbit'
 
-    # Выбираем две первые подсказки из массива.
-    suggests = [
-        {'title': suggest, 'hide': True}
-        for suggest in session['suggests'][:2]
-    ]
+    suggests = random.choices(sessionStorage[user_id][animal], 2)
+    if len(sessionStorage[user_id][animal]) < 2:
+        sessionStorage[user_id][animal].extend(['Ладно', 'Куплю'])
 
-    # Убираем первую подсказку, чтобы подсказки менялись каждый раз.
-    session['suggests'] = session['suggests'][1:]
-    sessionStorage[user_id] = session
-
-    # Если осталась только одна подсказка, предлагаем подсказку
-    # со ссылкой на Яндекс.Маркет.
-    if len(suggests) < 2:
-        suggests.append({
-            "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
-            "hide": True
-        })
+    suggests = [{'title': title, 'hide': True} for title in suggests]
 
     return suggests
 
